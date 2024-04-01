@@ -1,8 +1,10 @@
 import cantools
 import math
 
+
 class DataLog(object):
     """ Container for storing log data which contains a set of channels with time series data."""
+
     def __init__(self, name=""):
         self.name = name
         self.channels = {}
@@ -102,7 +104,21 @@ class DataLog(object):
         # We'll keep a map of names and column numbers for easy channel lookups when parsing rows
         i = 0
         channel_dict = {}
+        replace_names = {
+            'distance_traveled': 'distance',
+            'latitude':          'GPS Latitude',
+            'longitude':         'GPS Longitude',
+
+            'Interval':          'timestamp',
+            'Distance':          'distance',
+            'Latitude':          'GPS Latitude',
+            'Longitude':         'GPS Longitude',
+        }
         for name in channel_names:
+            name = name.split("|")[0].strip('"')
+            if name in replace_names:
+                name = replace_names[name]
+
             self.add_channel(name, "", float, 0)
 
             channel_dict[name] = i
@@ -114,7 +130,7 @@ class DataLog(object):
             values = line.split(",")
 
             # Timestamp is the first element
-            t = float(values[0])
+            t = float(values[0]) / 1000
 
             # Grab each remaining channel value. We keep a map of all the channel names and column
             # numbers we are retrieving, so we will look at that to determine which columns to read.
@@ -123,6 +139,10 @@ class DataLog(object):
             for name, i in channel_dict.items():
                 # We'll only parse numeric data
                 try:
+                    if values[i + 1] == '':
+                        values[i + 1] = '0.0'
+                        continue
+
                     val = float(values[i + 1])
                     message = Message(t, val)
                     self.channels[name].messages.append(message)
@@ -132,7 +152,7 @@ class DataLog(object):
                     self.channels[name].decimals = max(decimals_present, self.channels[name].decimals)
                 except ValueError:
                     print("WARNING: Found non numeric values for channel %s, removing channel" % \
-                        name)
+                          name)
                     invalid_channels.append(name)
 
             for name in invalid_channels:
@@ -186,8 +206,10 @@ class DataLog(object):
             output += "\n\t%s" % channel_data
         return output
 
+
 class Channel(object):
     """ Represents a singe channel of data containing a time series of values."""
+
     def __init__(self, name, units, data_type, decimals, messages=None):
         self.name = str(name)
         self.units = str(units)
@@ -262,10 +284,12 @@ class Channel(object):
 
     def __str__(self):
         return "Channel: %s, Units: %s, Decimals: %d, Messages: %d, Frequency: %.2f Hz" % \
-        (self.name, self.units, self.decimals, len(self.messages), self.avg_frequency())
+            (self.name, self.units, self.decimals, len(self.messages), self.avg_frequency())
+
 
 class Message(object):
     """ A single message in a time series of data. """
+
     def __init__(self, timestamp=0, value=0):
         self.timestamp = float(timestamp)
         self.value = float(value)
